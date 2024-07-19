@@ -1,0 +1,9 @@
+myenv/
+src/__pycache__/
+src/temp/
+
+# exclude everything
+output/*
+
+# exception to the rule (doing this to not mess up file outputs)
+!output/.gitkeep 
