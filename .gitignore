@@ -1,6 +1,7 @@
 myenv/
 src/__pycache__/
 src/temp/
+src/dependencies/__pycache__
 
 # exclude everything
 output/*
