@@ -8,6 +8,8 @@ class GREDataProcessor:
         self.filepath = filepath
         self.df = None
         self.pivot_df = None
+        self.gamma_pivot_df = None
+        self.vega_pivot_df = None
         self.result_dict = {}
         self.traders = ['Beimnet', 'Bouchra', 'Eduardo', 'Felman']
     
@@ -33,8 +35,9 @@ class GREDataProcessor:
             lambda x: ' '.join(filter(lambda y: y != 'nan' and y != '', x)), axis=1)
     
     def pivot_dataframe(self):
-        self.pivot_df = self.df.pivot_table(index=None, columns='combined', values='Delta', aggfunc='first').reset_index(drop=True)
+        self.pivot_df = self.df.pivot_table(index=None, columns='combined', values=['Delta', '$Gamma', '$Vega'], aggfunc='first').reset_index(drop=True)
         self.pivot_df.ffill(inplace=True)
+        self.pivot_df.to_csv('../output/testing.csv')
 
     def sum_deltas(self, column_pattern):
         cols = self.pivot_df.filter(regex=column_pattern).columns
@@ -42,7 +45,7 @@ class GREDataProcessor:
 
     def calculate_trader_deltas(self):
         for trader in self.traders:
-            btc_core_col = f'{trader} Crypto BTC Core BTC'
+            btc_core_col = (f'{trader} Crypto BTC Core BTC', 'Delta')
             btc_options_cols = self.pivot_df.filter(regex=f'{trader} Crypto BTC Options $').columns
             btc_relative_col = f'{trader} Crypto BTC RelativeValue BTC'
 
@@ -55,17 +58,17 @@ class GREDataProcessor:
             sol_relative_col = f'{trader} Crypto SOL RelativeValue SOL'
 
             btc_core_sum = self.pivot_df[btc_core_col].sum() if btc_core_col in self.pivot_df else 0
-            btc_options_sum = self.pivot_df[btc_options_cols].sum().sum() if btc_options_cols.shape[0] > 0 else 0
+            btc_options_sum = self.pivot_df.loc[2,btc_options_cols].sum() if btc_options_cols.shape[0] > 0 else 0
             btc_relative_sum = self.pivot_df[btc_relative_col].sum() if btc_relative_col in self.pivot_df else 0
             btc_total_sum = btc_core_sum + btc_options_sum + btc_relative_sum
 
             eth_core_sum = self.pivot_df[eth_core_col].sum() if eth_core_col in self.pivot_df else 0
-            eth_options_sum = self.pivot_df[eth_options_cols].sum().sum() if eth_options_cols.shape[0] > 0 else 0
+            eth_options_sum = self.pivot_df.loc[2, eth_options_cols].sum()if eth_options_cols.shape[0] > 0 else 0
             eth_relative_sum = self.pivot_df[eth_relative_col].sum() if eth_relative_col in self.pivot_df else 0
             eth_total_sum = eth_core_sum + eth_options_sum + eth_relative_sum
 
             sol_core_sum = self.pivot_df[sol_core_col].sum() if sol_core_col in self.pivot_df else 0
-            sol_options_sum = self.pivot_df[sol_options_cols].sum().sum() if sol_options_cols.shape[0] > 0 else 0
+            sol_options_sum = self.pivot_df.loc[2, sol_options_cols].sum() if sol_options_cols.shape[0] > 0 else 0
             sol_relative_sum = self.pivot_df[sol_relative_col].sum() if sol_relative_col in self.pivot_df else 0
             sol_total_sum = sol_core_sum + sol_options_sum + sol_relative_sum
 
@@ -81,11 +84,12 @@ class GREDataProcessor:
                         ticker = parts[4]
                         if underlier == ticker and underlier not in ['BTC', 'ETH', 'SOL', 'BGCI', 'GDAM1']:
                             if 'Core' in col:
-                                alts_core_sum += self.pivot_df[col].sum()
+                                alts_core_sum += self.pivot_df[col][2]
+                                print(self.pivot_df[col][2])
                             elif 'Options' in col:
-                                alts_options_sum += self.pivot_df[col].sum()
+                                alts_options_sum += self.pivot_df[col][2]
                             elif 'RelativeValue' in col:
-                                alts_relative_sum += self.pivot_df[col].sum()
+                                alts_relative_sum += self.pivot_df[col][2]
 
             alts_total_sum = alts_core_sum + alts_options_sum + alts_relative_sum
             trader_total_sum = btc_total_sum + eth_total_sum + sol_total_sum + alts_total_sum
@@ -146,18 +150,18 @@ class GREDataProcessor:
 
         novo_btc_core_sum = self.pivot_df[novo_btc_core_col].sum() if novo_btc_core_col in self.pivot_df else 0
         novo_btc_etf_sum = self.pivot_df[novo_btc_etf_cols].sum().sum() if len(novo_btc_etf_cols) > 0 else 0
-        novo_btc_options_sum = self.pivot_df[novo_btc_options_cols].sum().sum() if len(novo_btc_options_cols) > 0 else 0
+        novo_btc_options_sum = self.pivot_df.loc[2, novo_btc_options_cols].sum()if len(novo_btc_options_cols) > 0 else 0
         novo_btc_total_sum = novo_btc_core_sum + novo_btc_etf_sum + novo_btc_options_sum
 
         novo_eth_core_sum = self.pivot_df[novo_eth_core_col].sum() if novo_eth_core_col in self.pivot_df else 0
         novo_eth_etf_sum = self.pivot_df[novo_eth_etf_cols].sum().sum() if len(novo_eth_etf_cols) > 0 else 0
-        novo_eth_options_sum = self.pivot_df[novo_eth_options_cols].sum().sum() if len(novo_eth_options_cols) > 0 else 0
+        novo_eth_options_sum = self.pivot_df.loc[2, novo_eth_options_cols].sum() if len(novo_eth_options_cols) > 0 else 0
         novo_eth_total_sum = novo_eth_core_sum + novo_eth_etf_sum + novo_eth_options_sum
 
         novo_sol_core_sum = self.pivot_df[novo_sol_core_col].sum() if novo_sol_core_col in self.pivot_df else 0
         novo_sol_etf_sum = self.pivot_df[novo_sol_etf_cols].sum().sum() if len(novo_sol_etf_cols) > 0 else 0
         novo_sol_locked_sum = self.pivot_df[novo_sol_locked_col].sum() if novo_sol_locked_col in self.pivot_df else 0
-        novo_sol_options_sum = self.pivot_df[novo_sol_options_cols].sum().sum() if len(novo_sol_options_cols) > 0 else 0
+        novo_sol_options_sum = self.pivot_df.loc[2, novo_sol_options_cols].sum() if len(novo_sol_options_cols) > 0 else 0
         novo_sol_total_sum = novo_sol_core_sum + novo_sol_etf_sum + novo_sol_locked_sum + novo_sol_options_sum
 
         novo_alts_sum = 0
@@ -167,7 +171,9 @@ class GREDataProcessor:
                 underlier = parts[2]
                 ticker = parts[4]
                 if underlier == ticker and underlier not in ['BTC', 'ETH', 'SOL', 'BGCI', 'GDAM1']:
-                    novo_alts_sum += self.pivot_df[col].sum()
+                    novo_alts_sum += self.pivot_df[col][2]
+                    print(self.pivot_df[col][2])
+                    print(f"Sum:{novo_alts_sum}")
 
         novo_total_sum = novo_btc_total_sum + novo_eth_total_sum + novo_sol_total_sum + novo_alts_sum
 
@@ -192,6 +198,59 @@ class GREDataProcessor:
 
         self.result_dict.update(novo_dict)
 
+    def calculate_trader_greeks(self):
+        for trader in self.traders:
+            btc_options_cols = self.pivot_df.filter(regex=f'{trader} Crypto BTC Options $').columns
+            btc_gamma_sum = self.pivot_df.loc[0, btc_options_cols].sum() if btc_options_cols.shape[0] > 0 else 0
+            btc_vega_sum = self.pivot_df.loc[1, btc_options_cols].sum() if btc_options_cols.shape[0] > 0 else 0
+            eth_options_cols = self.pivot_df.filter(regex=f'{trader} Crypto ETH Options $').columns
+            eth_gamma_sum = self.pivot_df.loc[0, eth_options_cols].sum() if eth_options_cols.shape[0] > 0 else 0
+            eth_vega_sum = self.pivot_df.loc[1, eth_options_cols].sum() if eth_options_cols.shape[0] > 0 else 0
+            sol_options_cols = self.pivot_df.filter(regex=f'{trader} Crypto SOL Options $').columns
+            sol_gamma_sum = self.pivot_df.loc[0, sol_options_cols].sum() if sol_options_cols.shape[0] > 0 else 0
+            sol_vega_sum = self.pivot_df.loc[1, sol_options_cols].sum() if sol_options_cols.shape[0] > 0 else 0
+
+            if btc_gamma_sum != 0:
+                self.result_dict[f'{trader} BTC Options Gamma'] = btc_gamma_sum
+            if btc_vega_sum != 0:
+                self.result_dict[f'{trader} BTC Options Vega'] = btc_vega_sum
+
+            if eth_gamma_sum != 0:
+                self.result_dict[f'{trader} ETH Options Gamma'] = eth_gamma_sum
+            if eth_vega_sum != 0:
+                self.result_dict[f'{trader} ETH Options Vega'] = eth_vega_sum
+
+            if sol_gamma_sum != 0:
+                self.result_dict[f'{trader} SOL Options Gamma'] = sol_gamma_sum
+            if sol_vega_sum != 0:
+                self.result_dict[f'{trader} SOL Options Vega'] = sol_vega_sum
+
+    def calculate_novo_greeks(self):
+        btc_options_cols = self.pivot_df.filter(regex='Novo Crypto BTC Options $').columns
+        btc_gamma_sum = self.pivot_df.loc[0, btc_options_cols].sum() if btc_options_cols.shape[0] > 0 else 0
+        btc_vega_sum = self.pivot_df.loc[1, btc_options_cols].sum() if btc_options_cols.shape[0] > 0 else 0
+        eth_options_cols = self.pivot_df.filter(regex='Novo Crypto ETH Options $').columns
+        eth_gamma_sum = self.pivot_df.loc[0, eth_options_cols].sum() if eth_options_cols.shape[0] > 0 else 0
+        eth_vega_sum = self.pivot_df.loc[1, eth_options_cols].sum() if eth_options_cols.shape[0] > 0 else 0
+        sol_options_cols = self.pivot_df.filter(regex='Novo Crypto SOL Options $').columns
+        sol_gamma_sum = self.pivot_df.loc[0, sol_options_cols].sum() if sol_options_cols.shape[0] > 0 else 0
+        sol_vega_sum = self.pivot_df.loc[1, sol_options_cols].sum() if sol_options_cols.shape[0] > 0 else 0
+
+        if btc_gamma_sum != 0:
+            self.result_dict['Novo BTC Options Gamma'] = btc_gamma_sum
+        if btc_vega_sum != 0:
+            self.result_dict['Novo BTC Options Vega'] = btc_vega_sum
+
+        if eth_gamma_sum != 0:
+            self.result_dict['Novo ETH Options Gamma'] = eth_gamma_sum
+        if eth_vega_sum != 0:
+            self.result_dict['Novo ETH Options Vega'] = eth_vega_sum
+
+        if sol_gamma_sum != 0:
+            self.result_dict['Novo SOL Options Gamma'] = sol_gamma_sum
+        if sol_vega_sum != 0:
+            self.result_dict['Novo SOL Options Vega'] = sol_vega_sum
+
     def calculate_summary(self):
         summary_dict = {
             'GDLP ex-Novo BTC Delta': 0,
@@ -199,7 +258,17 @@ class GREDataProcessor:
             'GDLP ex-Novo SOL Delta': 0,
             'GDLP ex-Novo Alts Delta': 0,
             'GDLP ex-Novo Delta': 0,
-            'GDLP ex-Novo ex-Alts Delta': 0
+            'GDLP ex-Novo ex-Alts Delta': 0,
+            'GDLP ex-Novo BTC Gamma': 0,
+            'GDLP ex-Novo ETH Gamma': 0,
+            'GDLP ex-Novo SOL Gamma': 0,
+            'GDLP ex-Novo Alts Gamma': 0,
+            'GDLP ex-Novo Gamma': 0,
+            'GDLP ex-Novo BTC Vega': 0,
+            'GDLP ex-Novo ETH Vega': 0,
+            'GDLP ex-Novo SOL Vega': 0,
+            'GDLP ex-Novo Alts Vega': 0,
+            'GDLP ex-Novo Vega': 0,
         }
 
         for key, value in self.result_dict.items():
@@ -216,16 +285,49 @@ class GREDataProcessor:
                 if 'Alts' not in key:
                     summary_dict['GDLP ex-Novo ex-Alts Delta'] += value
 
+            if 'BTC Options Gamma' in key and 'Novo' not in key:
+                summary_dict['GDLP ex-Novo BTC Gamma'] += value
+            elif 'ETH Options Gamma' in key and 'Novo' not in key:
+                summary_dict['GDLP ex-Novo ETH Gamma'] += value
+            elif 'SOL Options Gamma' in key and 'Novo' not in key:
+                summary_dict['GDLP ex-Novo SOL Gamma'] += value
+            elif 'Alts Options Gamma' in key and 'Novo' not in key:
+                summary_dict['GDLP ex-Novo Alts Gamma'] += value
+            elif 'Gamma' in key and 'Novo' not in key:
+                summary_dict['GDLP ex-Novo Gamma'] += value
+
+            if 'BTC Options Vega' in key and 'Novo' not in key:
+                summary_dict['GDLP ex-Novo BTC Vega'] += value
+            elif 'ETH Options Vega' in key and 'Novo' not in key:
+                summary_dict['GDLP ex-Novo ETH Vega'] += value
+            elif 'SOL Options Vega' in key and 'Novo' not in key:
+                summary_dict['GDLP ex-Novo SOL Vega'] += value
+            elif 'Alts Options Vega' in key and 'Novo' not in key:
+                summary_dict['GDLP ex-Novo Alts Vega'] += value
+            elif 'Vega' in key and 'Novo' not in key:
+                summary_dict['GDLP ex-Novo Vega'] += value
+
         gdlp_delta_dict = {
             'GDLP BTC Total Delta': summary_dict['GDLP ex-Novo BTC Delta'] + self.result_dict.get('Novo BTC Delta', 0),
             'GDLP ETH Total Delta': summary_dict['GDLP ex-Novo ETH Delta'] + self.result_dict.get('Novo ETH Delta', 0),
             'GDLP SOL Total Delta': summary_dict['GDLP ex-Novo SOL Delta'] + self.result_dict.get('Novo SOL Delta', 0),
             'GDLP Alts Total Delta': summary_dict.get('GDLP ex-Novo Alts Delta', 0) + self.result_dict.get('Novo Alts Delta', 0),
-            'GDLP Total Delta': summary_dict['GDLP ex-Novo Delta'] + self.result_dict.get('Novo Delta', 0)
+            'GDLP Total Delta': summary_dict['GDLP ex-Novo Delta'] + self.result_dict.get('Novo Delta', 0),
+            'GDLP BTC Total Gamma': summary_dict['GDLP ex-Novo BTC Gamma'] + self.result_dict.get('Novo BTC Options Gamma', 0),
+            'GDLP ETH Total Gamma': summary_dict['GDLP ex-Novo ETH Gamma'] + self.result_dict.get('Novo ETH Options Gamma', 0),
+            'GDLP SOL Total Gamma': summary_dict['GDLP ex-Novo SOL Gamma'] + self.result_dict.get('Novo SOL Options Gamma', 0),
+            'GDLP Alts Total Gamma': summary_dict.get('GDLP ex-Novo Alts Gamma', 0) + self.result_dict.get('Novo Alts Gamma', 0),
+            'GDLP Total Gamma': summary_dict['GDLP ex-Novo Gamma'] + self.result_dict.get('Novo Gamma', 0),
+            'GDLP BTC Total Vega': summary_dict['GDLP ex-Novo BTC Vega'] + self.result_dict.get('Novo BTC Options Vega', 0),
+            'GDLP ETH Total Vega': summary_dict['GDLP ex-Novo ETH Vega'] + self.result_dict.get('Novo ETH Options Vega', 0),
+            'GDLP SOL Total Vega': summary_dict['GDLP ex-Novo SOL Vega'] + self.result_dict.get('Novo SOL Options Vega', 0),
+            'GDLP Alts Total Vega': summary_dict.get('GDLP ex-Novo Alts Vega', 0) + self.result_dict.get('Novo Alts Vega', 0),
+            'GDLP Total Vega': summary_dict['GDLP ex-Novo Vega'] + self.result_dict.get('Novo Vega', 0),
         }
 
         summary_dict.update(gdlp_delta_dict)
         self.result_dict.update(summary_dict)
+
 
     def save_results(self):
         final_df = pd.DataFrame(self.result_dict, index=['Values'])
@@ -239,6 +341,8 @@ class GREDataProcessor:
         self.combine_columns()
         self.pivot_dataframe()
         self.calculate_trader_deltas()
+        self.calculate_trader_greeks()
         self.calculate_novo_deltas()
+        self.calculate_novo_greeks()
         self.calculate_summary()
         return self.save_results()
