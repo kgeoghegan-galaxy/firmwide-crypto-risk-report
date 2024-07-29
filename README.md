@@ -24,3 +24,9 @@ From frontpages (may be minor deviation with GRE numbers)
 VaR:
 From frontpages (may be minor deviation with GRE numbers)
     Can calculate within new scripts if I have time
+
+
+TODO:
+- Clean up repo, formalized daily reporting
+- Add support for gamma, vega, delta wow, dod, var/vol calculations to move away from macro report
+- Look at passive beta in gre vs macroreport/frontpages
