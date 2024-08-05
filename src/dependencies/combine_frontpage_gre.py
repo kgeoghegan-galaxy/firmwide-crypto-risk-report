@@ -34,7 +34,7 @@ class CombineFrontpageGRE:
 
         analysis = ConstructFrontpageTimeSeries(self.base_directory)
         frontpage_time_series = analysis.collect_data(novo_filename_pattern, ticker_groups, metrics, preprocess_tickers=True)
-        frontpage_time_series.to_csv('../output/frontpage_time_series.csv', index=False)
+        #frontpage_time_series.to_csv('../output/frontpage_time_series.csv', index=False)
 
         return frontpage_time_series
 
@@ -45,55 +45,61 @@ class CombineFrontpageGRE:
 
         analysis = ConstructFrontpageTimeSeries(self.base_directory)
         btc_price_time_series = analysis.collect_data(novo_filename_pattern, ticker_groups, metrics, preprocess_tickers=False)
-        btc_price_time_series.to_csv('../output/btc_price_time_series.csv', index=False)
+        #btc_price_time_series.to_csv('../output/btc_price_time_series.csv', index=False)
 
         return btc_price_time_series
 
-    def extract_values(self, frontpage_df, btc_price_df, date_str):
+    def extract_values(self, frontpage_df, btc_price_df, date_str, novo_alts_value):
         # Ensure the date and column names match
         print(f"Contents of frontpage_df:\n{frontpage_df}")
         print(f"Contents of btc_price_df:\n{btc_price_df}")
-        
+
+        # Check for required columns
         if 'Date' not in frontpage_df.columns or 'Ticker' not in frontpage_df.columns or 'Value' not in frontpage_df.columns:
             raise ValueError("The expected columns are not present in the frontpage DataFrame.")
-        
+
         if 'Date' not in btc_price_df.columns or 'Ticker' not in btc_price_df.columns or 'Value' not in btc_price_df.columns:
             raise ValueError("The expected columns are not present in the BTC price DataFrame.")
-        
+
         # Convert the Date column to string type and clean up any whitespace
         frontpage_df['Date'] = frontpage_df['Date'].astype(str).str.strip()
         btc_price_df['Date'] = btc_price_df['Date'].astype(str).str.strip()
-        
+
         # Filter the frontpage DataFrame for the specific date and metric
-        filtered_frontpage_df = frontpage_df[(frontpage_df['Date'] == date_str) & (frontpage_df['Metric'] == 'Mkt Val (ex DLOM) T-0 ($)')]
+        filtered_frontpage_df = frontpage_df[
+            (frontpage_df['Date'] == date_str) & (frontpage_df['Metric'] == 'Mkt Val (ex DLOM) T-0 ($)')]
         print(f"Filtered frontpage_df for date {date_str}:\n{filtered_frontpage_df}")
-        
+
         if filtered_frontpage_df.empty:
             raise ValueError(f"No data found for date {date_str} in frontpage DataFrame.")
-        
-        novo_alts_value = filtered_frontpage_df[filtered_frontpage_df['Ticker'] == 'Alts']
-        if novo_alts_value.empty:
+
+        liquid_ventures_delta = filtered_frontpage_df[filtered_frontpage_df['Ticker'] == 'Alts']
+        if liquid_ventures_delta.empty:
             raise ValueError(f"No 'Alts' ticker found for date {date_str} in frontpage DataFrame.")
-        novo_alts_value = novo_alts_value['Value'].values[0]
-        
+        liquid_ventures_delta = liquid_ventures_delta['Value'].values[0]
+
         passive_beta_value = filtered_frontpage_df[filtered_frontpage_df['Ticker'] == 'Passive Beta']
         if passive_beta_value.empty:
             raise ValueError(f"No 'Passive Beta' ticker found for date {date_str} in frontpage DataFrame.")
         passive_beta_value = passive_beta_value['Value'].values[0]
-        
+
         # Filter the BTC price DataFrame for the specific date and metric
-        filtered_btc_price_df = btc_price_df[(btc_price_df['Date'] == date_str) & (btc_price_df['Metric'] == 'Reference Price\n($) T-0')]
+        filtered_btc_price_df = btc_price_df[
+            (btc_price_df['Date'] == date_str) & (btc_price_df['Metric'] == 'Reference Price\n($) T-0')]
         print(f"Filtered btc_price_df for date {date_str}:\n{filtered_btc_price_df}")
-        
+
         if filtered_btc_price_df.empty:
             raise ValueError(f"No data found for date {date_str} in BTC price DataFrame.")
         btc_price = filtered_btc_price_df['Value'].values[0]
-        
+
         # Calculate modified 'Passive Beta Delta'
         modified_passive_beta_value = passive_beta_value + (btc_price * 270)
-        
+
+        # Subtract the Novo Alts value from the Liquid Ventures Delta
+        adjusted_liquid_ventures_delta = liquid_ventures_delta - novo_alts_value
+
         return {
-            'Novo Alts Delta': novo_alts_value,
+            'Liquid Ventures Delta': adjusted_liquid_ventures_delta,
             'Passive Beta Delta': modified_passive_beta_value
         }
         
@@ -102,10 +108,12 @@ class CombineFrontpageGRE:
         gre_df['Passive Beta Delta'] = values_dict['Passive Beta Delta']
         
         # Add the Novo Alts value to the Novo Alts Delta column if it exists, or create it
-        if 'Novo Alts Delta' in gre_df.columns:
-            gre_df['Novo Alts Delta'] = values_dict['Novo Alts Delta']
-        else:
-            gre_df = gre_df.assign(**{'Novo Alts Delta': values_dict['Novo Alts Delta']})
+        # if 'Novo Alts Delta' in gre_df.columns:
+        #     gre_df['Novo Alts Delta'] = values_dict['Novo Alts Delta']
+        # else:
+        #     gre_df = gre_df.assign(**{'Novo Alts Delta': values_dict['Novo Alts Delta']})
+
+        gre_df = gre_df.assign(**{'Liquid Ventures Delta': values_dict['Liquid Ventures Delta']})
         
         # Add Passive Beta Delta to GDLP Total Delta
         if 'GDLP Total Delta' in gre_df.columns:
@@ -116,15 +124,17 @@ class CombineFrontpageGRE:
         return gre_df
 
     
-    def save_combined_data(self, final_df):
-        final_df.to_csv('../output/23072024_with_novo.csv', index=False)
-        final_df.to_excel('../output/23072024_with_novo.xlsx', index=False)
+    def save_combined_data(self, final_df, date_str):
+        final_df.to_csv(f'../output/{date_str}.csv', index=False)
+        #final_df.to_excel(f'../output/{date_str}.xlsx', index=False)
 
     def run(self):
         date_str = self.get_date_from_filepath(self.gre_data_filepath)
         
         # Pull GRE data
         gre_df = self.pull_gre_data()
+
+        novo_alts_value = gre_df['Novo Alts Delta'].iloc[0]  # Adjust as necessary to get the correct value
         
         # Pull frontpage data
         frontpage_df = self.pull_frontpage_data(date_str)
@@ -133,10 +143,10 @@ class CombineFrontpageGRE:
         btc_price_df = self.pull_btc_price_data(date_str)
         
         # Extract values
-        values_dict = self.extract_values(frontpage_df, btc_price_df, date_str)
+        values_dict = self.extract_values(frontpage_df, btc_price_df, date_str, novo_alts_value)
         
         # Integrate values into GRE data without modifying existing data
         final_df = self.integrate_values(gre_df, values_dict)
         
         # Save combined data
-        self.save_combined_data(final_df)
+        self.save_combined_data(final_df, date_str)
